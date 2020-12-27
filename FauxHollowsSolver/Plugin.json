@@ -1,0 +1,9 @@
+{
+  "Author": "daemitus",
+  "Name": "ezFauxHollows",
+  "Description": "Faux Hollows solution finder",
+  "InternalName": "FauxHollowsSolver",
+  "AssemblyVersion": "1.0.0.0",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 2
+}
