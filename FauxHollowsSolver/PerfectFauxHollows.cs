@@ -23,14 +23,12 @@ namespace FauxHollowsSolver
             if (state.Contains(Tile.Unknown))
                 return recommendations;
 
-
             var blockedCount = state.Count(tile => tile == Tile.Blocked);
             var hiddenCount = state.Count(tile => tile == Tile.Hidden);
             var attemptsRemaining = MaxAttempts - (TotalTiles - blockedCount - hiddenCount);
 
             if (attemptsRemaining == 0)
                 return recommendations;
-
 
             var checkedIndices = new List<int>();
 
@@ -179,12 +177,9 @@ namespace FauxHollowsSolver
 
                     if (!foundCommander && attemptsRemaining >= 1)
                     {
-                        if (x < TileRowLen && y < TileColLen)
-                        {
-                            var rect = GetRectIndices(i, 1, 1);
-                            if (rect.All(ri => state[ri] == Tile.Hidden))
-                                possibleCommanders.Add(rect);
-                        }
+                        var rect = GetRectIndices(i, 1, 1);
+                        if (rect.All(ri => state[ri] == Tile.Hidden))
+                            possibleCommanders.Add(rect);
                     }
                 }
             }

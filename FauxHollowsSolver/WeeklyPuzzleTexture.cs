@@ -1,4 +1,4 @@
-﻿namespace FauxHollowsSolver
+namespace FauxHollowsSolver
 {
     internal enum WeeklyPuzzleTexture
     {

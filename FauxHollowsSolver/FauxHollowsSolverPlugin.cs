@@ -1,201 +1,165 @@
 ﻿using Dalamud.Plugin;
 using ImGuiNET;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using System;
 using System.Linq;
 using System.Numerics;
-using FFXIVClientStructs.Component.GUI;
-using Dalamud.Game.Internal;
-using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FauxHollowsSolver
 {
-
     public sealed class FauxHollowsPlugin : IDalamudPlugin
     {
         public string Name => "ezFauxHollows";
-
-        private const int TotalTiles = PerfectFauxHollows.TotalTiles;
 
         internal DalamudPluginInterface Interface;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
-            this.Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
+            Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
-            this.Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_Overlay;
-            this.Interface.Framework.OnUpdateEvent += Framework_OnUpdateEvent;
+            Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
+            LoopTokenSource = new CancellationTokenSource();
+            LoopTask = Task.Run(() => GameBoardUpdaterLoop(LoopTokenSource.Token));
+
+            Interface.ClientState.OnLogin += UserWarning;
+            if (Interface.ClientState.LocalPlayer != null)
+                UserWarning(null, null);
+        }
+
+        private void UserWarning(object sender, EventArgs args)
+        {
+            Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
         }
 
         public void Dispose()
         {
-            this.Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_Overlay;
-            this.Interface.Framework.OnUpdateEvent -= Framework_OnUpdateEvent;
+            Interface.ClientState.OnLogin -= UserWarning;
+            Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
+            LoopTokenSource.Cancel();
         }
 
-        #region GameLogic
-
+        private Task LoopTask;
+        private CancellationTokenSource LoopTokenSource;
+        private Tile[] GameState = new Tile[36];
         private readonly PerfectFauxHollows PerfectFauxHollows = new PerfectFauxHollows();
-        private Tile[] previousState = new Tile[TotalTiles];
 
-        private unsafe void Framework_OnUpdateEvent(Framework framework)
+        private async void GameBoardUpdaterLoop(CancellationToken token)
+        {
+            for (int i = 0; i < 36; i++)
+                GameState[i] = Tile.Unknown;
+
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(100, token);
+                    GameBoardUpdater();
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "Updater loop has crashed");
+                Interface.Framework.Gui.Chat.PrintError($"{Name} has encountered a critical error");
+            }
+        }
+
+        private unsafe void GameBoardUpdater()
         {
             if (Interface.ClientState.TerritoryType != 478) // Idyllshire
                 return;
 
-            UpdateGameData();
-
-            if (!FauxHollowsGameData.IsVisible)
+            var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyPuzzle", 1);
+            if (addonPtr == IntPtr.Zero)
                 return;
 
-            var gameState = GetSolverState();
-            if (!Enumerable.SequenceEqual(gameState, previousState))
-            {
-                previousState = gameState;
+            var addon = (AddonWeeklyPuzzle*)addonPtr;
+            if (addon == null)
+                return;
 
+            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.ULDData.LoadedState != 3)
+                return;
+
+            var stateChanged = UpdateGameState(addon);
+            if (stateChanged)
+            {
                 // A valid gameState has atleast one blocked tile
                 // The board is likely not ready and in transition
-                if (!gameState.Contains(Tile.Blocked))
+                if (!GameState.Contains(Tile.Blocked))
                     return;
 
-                var solution = PerfectFauxHollows.Solve(gameState);
-                var solnMaxValue = solution.Where(s => s < TotalTiles).Max();
+                var solution = PerfectFauxHollows.Solve(GameState);
+                var solnMaxValue = solution.Where(s => s < 16).Max();
                 if (solnMaxValue <= 1)
                     solnMaxValue = -1;
 
-                for (int i = 0; i < TotalTiles; i++)
+                for (int i = 0; i < 36; i++)
                 {
                     var soln = solution[i];
-                    var bgNode = FauxHollowsGameData.BgNodes[i];
+                    var tileButton = GetTileButton(addon, i);
+                    var tileBackgroundImage = GetBackgroundImageNode(tileButton);
 
                     if (soln == PerfectFauxHollows.ConfirmedSword ||
                         soln == PerfectFauxHollows.ConfirmedBox ||
                         soln == PerfectFauxHollows.ConfirmedChest ||
                         soln == solnMaxValue)
                     {
-                        bgNode->AtkResNode.AddRed = 32;
-                        bgNode->AtkResNode.AddGreen = 143;
-                        bgNode->AtkResNode.AddBlue = 46;
+                        tileBackgroundImage->AtkResNode.AddRed = 32;
+                        tileBackgroundImage->AtkResNode.AddGreen = 143;
+                        tileBackgroundImage->AtkResNode.AddBlue = 46;
                     }
                     else
                     {
-                        bgNode->AtkResNode.AddRed = 0;
-                        bgNode->AtkResNode.AddGreen = 0;
-                        bgNode->AtkResNode.AddBlue = 0;
+                        tileBackgroundImage->AtkResNode.AddRed = 0;
+                        tileBackgroundImage->AtkResNode.AddGreen = 0;
+                        tileBackgroundImage->AtkResNode.AddBlue = 0;
                     }
                 }
-
-                var msg = "";
-                for (int i = 0; i < TotalTiles; i++)
-                {
-                    msg += $"{solution[i],2} ";
-                    if ((i + 1) % 6 == 0)
-                        msg += "\n";
-                }
-                PluginLog.Information($"SOLUTION=\n{msg}");
             }
         }
 
-        public static unsafe class FauxHollowsGameData
+        private unsafe bool UpdateGameState(AddonWeeklyPuzzle* addon)
         {
-            public static float X;
-            public static float Y;
-            public static ushort Width;
-            public static ushort Height;
-            public static bool IsVisible;
-            public static AtkImageNode*[] BgNodes = new AtkImageNode*[TotalTiles];
-            public static AtkImageNode*[] IconNodes = new AtkImageNode*[TotalTiles];
-        }
-
-        private unsafe void UpdateGameData()
-        {
-            var addon = Interface.Framework.Gui.GetAddonByName("WeeklyPuzzle", 1);
-
-            if (addon is null || addon.Address == IntPtr.Zero)
+            var stateChanged = false;
+            for (int i = 0; i < 36; i++)
             {
-                FauxHollowsGameData.IsVisible = false;
-                return;
-            }
+                var tileButton = GetTileButton(addon, i);
+                var tileBackgroundImage = GetBackgroundImageNode(tileButton);
+                var tileBackgroundTex = (WeeklyPuzzleTexture)tileBackgroundImage->PartId;
 
-            var uiAddon = (AtkUnitBase*)addon.Address;
-
-            FauxHollowsGameData.X = uiAddon->RootNode->X;
-            FauxHollowsGameData.Y = uiAddon->RootNode->Y;
-            FauxHollowsGameData.Width = (ushort)(uiAddon->RootNode->Width * uiAddon->RootNode->ScaleX);
-            FauxHollowsGameData.Height = (ushort)(uiAddon->RootNode->Height * uiAddon->RootNode->ScaleY);
-            FauxHollowsGameData.IsVisible = (uiAddon->Flags & 0x20) == 0x20;
-
-            var baseParentNode = uiAddon->RootNode->ChildNode->PrevSiblingNode;
-
-            var tileNode = baseParentNode->ChildNode;
-            for (var i = 0; i < TotalTiles; i++)
-            {
-                if (tileNode == null)
-                    throw new Exception("Problem fetching tile node");
-
-                var tileCompNode = (AtkComponentNode*)tileNode;
-                var tileRootNode = tileCompNode->Component->ULDData.RootNode;
-                var tileBgImageNode = (AtkImageNode*)tileRootNode->PrevSiblingNode->ChildNode->PrevSiblingNode;
-                var iconFgImageNode = (AtkImageNode*)tileBgImageNode->AtkResNode.PrevSiblingNode->ChildNode->PrevSiblingNode;
-
-                FauxHollowsGameData.BgNodes[TotalTiles - 1 - i] = tileBgImageNode;
-                FauxHollowsGameData.IconNodes[TotalTiles - 1 - i] = iconFgImageNode;
-
-                tileNode = tileNode->PrevSiblingNode;
-            }
-        }
-
-        /// <summary>
-        /// Get the list of revealed numbers PerfectCactbot style
-        /// </summary>
-        /// <param name="tileNodes">Current UI data</param>
-        /// <returns>Int array of numbers, 0 for unknown.</returns>
-        private unsafe Tile[] GetSolverState()
-        {
-            var tiles = new Tile[TotalTiles];
-
-            for (int i = 0; i < TotalTiles; i++)
-            {
-                var tileBgImageNode = FauxHollowsGameData.BgNodes[i];
-                var iconFgImageNode = FauxHollowsGameData.IconNodes[i];
-
-
-                if (i == 11 || i == 14)
-                    PluginLog.Verbose(
-                        $"{i} " +
-                        $"{(ulong)iconFgImageNode:X} " +
-                        $"{iconFgImageNode->AtkResNode.Flags:X}");
-
-                var tileTexBg = (WeeklyPuzzleTexture)tileBgImageNode->PartId;
-                if (tileTexBg == WeeklyPuzzleTexture.Hidden)
+                var newState = Tile.Unknown;
+                if (tileBackgroundTex == WeeklyPuzzleTexture.Hidden)
                 {
-                    tiles[i] = Tile.Hidden;
+                    newState = Tile.Hidden;
                 }
-                else if (tileTexBg == WeeklyPuzzleTexture.Blocked)
+                else if (tileBackgroundTex == WeeklyPuzzleTexture.Blocked)
                 {
-                    tiles[i] = Tile.Blocked;
+                    newState = Tile.Blocked;
                 }
-                else if (tileTexBg == WeeklyPuzzleTexture.Blank)
+                else if (tileBackgroundTex == WeeklyPuzzleTexture.Blank)
                 {
-                    var iconIsVisible = (iconFgImageNode->AtkResNode.Flags & 0x10) == 0x10;
-                    if (!iconIsVisible)
+                    var tileIconImage = GetIconImageNode(tileButton);
+                    var tileIconTex = (WeeklyPuzzlePrizeTexture)tileIconImage->PartId;
+
+                    if (!tileIconImage->AtkResNode.IsVisible)
                     {
-                        tiles[i] = Tile.Empty;
+                        newState = Tile.Empty;
                     }
                     else
                     {
-                        var prizeTexFg = (WeeklyPuzzlePrizeTexture)iconFgImageNode->PartId;
-                        var tile = prizeTexFg switch
+                        newState = tileIconTex switch
                         {
                             WeeklyPuzzlePrizeTexture.BoxUpperLeft => Tile.BoxUpperLeft,
                             WeeklyPuzzlePrizeTexture.BoxUpperRight => Tile.BoxUpperRight,
                             WeeklyPuzzlePrizeTexture.BoxLowerLeft => Tile.BoxLowerLeft,
                             WeeklyPuzzlePrizeTexture.BoxLowerRight => Tile.BoxLowerRight,
-
                             WeeklyPuzzlePrizeTexture.ChestUpperLeft => Tile.ChestUpperLeft,
                             WeeklyPuzzlePrizeTexture.ChestUpperRight => Tile.ChestUpperRight,
                             WeeklyPuzzlePrizeTexture.ChestLowerLeft => Tile.ChestLowerLeft,
                             WeeklyPuzzlePrizeTexture.ChestLowerRight => Tile.ChestLowerRight,
-
                             WeeklyPuzzlePrizeTexture.SwordsUpperLeft => Tile.SwordsUpperLeft,
                             WeeklyPuzzlePrizeTexture.SwordsUpperRight => Tile.SwordsUpperRight,
                             WeeklyPuzzlePrizeTexture.SwordsMiddleLeft => Tile.SwordsMiddleLeft,
@@ -203,158 +167,204 @@ namespace FauxHollowsSolver
                             WeeklyPuzzlePrizeTexture.SwordsLowerLeft => Tile.SwordsLowerLeft,
                             WeeklyPuzzlePrizeTexture.SwordsLowerRight => Tile.SwordsLowerRight,
                             WeeklyPuzzlePrizeTexture.Commander => Tile.Commander,
-                            _ => Tile.Unknown,
+                            _ => throw new Exception($"Unknown tile icon state: {tileIconTex} at index {i}")
                         };
 
-                        if (tile == Tile.Unknown)
-                        {
-                            PluginLog.Error($"Unknown Tile: bgID={tileTexBg} ({(int)tileTexBg}) fgID={prizeTexFg} ({(int)prizeTexFg})");
-                        }
-
-                        // Rotation
-                        var rotation = iconFgImageNode->AtkResNode.Rotation;
+                        var rotation = tileIconImage->AtkResNode.Rotation;
                         if (rotation < 0)
-                            tile |= Tile.RotatedLeft;
+                            newState |= Tile.RotatedLeft;
                         else if (rotation > 0)
-                            tile |= Tile.RotatedRight;
-
-                        tiles[i] = tile;
+                            newState |= Tile.RotatedRight;
                     }
                 }
                 else
                 {
-                    PluginLog.Error($"Unknown TileBgTexID {tileTexBg} ({(int)tileTexBg}) at index {i}");
+                    throw new Exception($"Unknown tile bg state: {tileBackgroundTex} at index {i}");
                 }
-            }
 
-            return tiles;
+                stateChanged |= GameState[i] != newState;
+                GameState[i] = newState;
+            }
+            return stateChanged;
         }
 
-        #endregion GameLogic
+        private unsafe AtkComponentButton* GetTileButton(AddonWeeklyPuzzle* addon, int index) => addon->GameBoard[index / 6][index % 6].Button;
 
-        #region ImGui
+        private unsafe AtkImageNode* GetBackgroundImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.ULDData.NodeList[3];
 
-        private unsafe void UiBuilder_OnBuildUi_Overlay()
+        private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.ULDData.NodeList[6];
+
+
+        private unsafe void UiBuilder_OnBuildUi_DebugUI()
         {
-            if (!FauxHollowsGameData.IsVisible)
-                return;
-
             ImGui.SetNextWindowPos(new Vector2(500, 500), ImGuiCond.FirstUseEver);
             ImGui.SetNextWindowSize(new Vector2(500, 500), ImGuiCond.FirstUseEver);
 
-            bool alwaysTrue = true;
-            ImGui.Begin("FFXIV FauxHollows Solver", ref alwaysTrue);
+            bool alwaysTrue2 = true;
+            ImGui.Begin("FFXIV FauxHollows Solver", ref alwaysTrue2);
 
-
-            var state = GetSolverState();
-
-            for (int i = 1; i <= TotalTiles; i++)
+            for (int i = 0; i < 36; i++)
             {
-                ImGui.Text($"{i:D2}");
-                if (i % 6 != 0)
+                ImGui.Text($"{GameState[i]}");
+                if ((i + 1) % 6 != 0)
                     ImGui.SameLine();
             }
 
             ImGui.Text("");
 
-            for (int i = 1; i <= TotalTiles; i++)
+            var tileStates = new string[] {
+                "Hidden", "Blocked", "Empty",
+                "BoxUL", "BoxUR", "BoxLL", "BoxLR",
+                "ChestUL", "ChestUR", "ChestLL", "ChestLR",
+                "SwordsUL", "SwordsUR", "SwordsML", "SwordsMR", "SwordsLL", "SwordsLR",
+                "Commander", "Unknown"
+            };
+            var rotationStates = new string[] { "-", "L", "R" };
+
+            for (int i = 0; i < 36; i++)
             {
-                var maskedTile = state[i - 1];
+                var maskedTile = GameState[i];
 
-                var c = maskedTile switch
+                var tileIndex = maskedTile.Unmask() switch
                 {
-                    Tile.Hidden => "?",
-                    Tile.Blocked => "X",
-                    Tile.Empty => "-",
-
-                    Tile.BoxUpperLeft => "BUL",
-                    Tile.BoxUpperRight => "BUR",
-                    Tile.BoxLowerLeft => "BLL",
-                    Tile.BoxLowerRight => "BLR",
-                    Tile.BoxUpperLeft | Tile.RotatedLeft => "LBUL",
-                    Tile.BoxUpperRight | Tile.RotatedLeft => "LBUR",
-                    Tile.BoxLowerLeft | Tile.RotatedLeft => "LBLL",
-                    Tile.BoxLowerRight | Tile.RotatedLeft => "LBLR",
-                    Tile.BoxUpperLeft | Tile.RotatedRight => "RBUL",
-                    Tile.BoxUpperRight | Tile.RotatedRight => "RBUR",
-                    Tile.BoxLowerLeft | Tile.RotatedRight => "RBLL",
-                    Tile.BoxLowerRight | Tile.RotatedRight => "RBLR",
-
-                    Tile.ChestUpperLeft => "CUL",
-                    Tile.ChestUpperRight => "CUR",
-                    Tile.ChestLowerLeft => "CLL",
-                    Tile.ChestLowerRight => "CLR",
-                    Tile.ChestUpperLeft | Tile.RotatedLeft => "LCUL",
-                    Tile.ChestUpperRight | Tile.RotatedLeft => "LCUR",
-                    Tile.ChestLowerLeft | Tile.RotatedLeft => "LCLL",
-                    Tile.ChestLowerRight | Tile.RotatedLeft => "LCLR",
-                    Tile.ChestUpperLeft | Tile.RotatedRight => "RCUL",
-                    Tile.ChestUpperRight | Tile.RotatedRight => "RCUR",
-                    Tile.ChestLowerLeft | Tile.RotatedRight => "RCLL",
-                    Tile.ChestLowerRight | Tile.RotatedRight => "RCLR",
-
-                    Tile.SwordsUpperLeft => "SUL",
-                    Tile.SwordsUpperRight => "SUR",
-                    Tile.SwordsMiddleLeft => "SML",
-                    Tile.SwordsMiddleRight => "MR",
-                    Tile.SwordsLowerLeft => "SLL",
-                    Tile.SwordsLowerRight => "SLR",
-                    Tile.SwordsUpperLeft | Tile.RotatedLeft => "LSUL",
-                    Tile.SwordsUpperRight | Tile.RotatedLeft => "LSUR",
-                    Tile.SwordsMiddleLeft | Tile.RotatedLeft => "LSML",
-                    Tile.SwordsMiddleRight | Tile.RotatedLeft => "LSMR",
-                    Tile.SwordsLowerLeft | Tile.RotatedLeft => "LSLL",
-                    Tile.SwordsLowerRight | Tile.RotatedLeft => "LSLR",
-                    Tile.SwordsUpperLeft | Tile.RotatedRight => "RSUL",
-                    Tile.SwordsUpperRight | Tile.RotatedRight => "RSUR",
-                    Tile.SwordsMiddleLeft | Tile.RotatedRight => "RSML",
-                    Tile.SwordsMiddleRight | Tile.RotatedRight => "RSMR",
-                    Tile.SwordsLowerLeft | Tile.RotatedRight => "RSLL",
-                    Tile.SwordsLowerRight | Tile.RotatedRight => "RSLR",
-
-                    Tile.Commander => "C",
-                    _ => "!",
+                    Tile.Hidden => 0,
+                    Tile.Blocked => 1,
+                    Tile.Empty => 2,
+                    Tile.BoxUpperLeft => 3,
+                    Tile.BoxUpperRight => 4,
+                    Tile.BoxLowerLeft => 5,
+                    Tile.BoxLowerRight => 6,
+                    Tile.ChestUpperLeft => 7,
+                    Tile.ChestUpperRight => 8,
+                    Tile.ChestLowerLeft => 9,
+                    Tile.ChestLowerRight => 10,
+                    Tile.SwordsUpperLeft => 11,
+                    Tile.SwordsUpperRight => 12,
+                    Tile.SwordsMiddleLeft => 13,
+                    Tile.SwordsMiddleRight => 14,
+                    Tile.SwordsLowerLeft => 15,
+                    Tile.SwordsLowerRight => 16,
+                    Tile.Commander => 17,
+                    _ => 18,
                 };
-                ImGui.Text($"{c}");
-                if (i % 6 != 0)
+                var rotationIndex = maskedTile.IsRotatedLeft() ? 1 : maskedTile.IsRotatedRight() ? 2 : 0;
+
+
+                ImGui.SetNextItemWidth(90);
+                if (ImGui.Combo($"##EditTile{i}", ref tileIndex, tileStates, tileStates.Length))
+                {
+                    SetTileState(i, tileIndex, rotationIndex);
+                }
+
+                ImGui.SameLine();
+
+                ImGui.SetNextItemWidth(40);
+                if (ImGui.Combo($"##EditTileRotation{i}", ref rotationIndex, rotationStates, rotationStates.Length))
+                {
+                    SetTileState(i, tileIndex, rotationIndex);
+                }
+
+                if ((i + 1) % 6 != 0)
                     ImGui.SameLine();
             }
 
+
+            if (ImGui.Button($"Freshen"))
+            {
+                for (int i = 0; i < 36; i++)
+                {
+                    SetTileState(i, 0, 0); // Hidden
+                }
+
+                var Random = new Random();
+                var randomValues = new int[6] { -1, -1, 1 - 1, -1, -1, -1 };
+                for (int i = 0; i < randomValues.Length; i++)
+                {
+                    int nextRandom = Random.Next(0, 36);
+                    while (randomValues.Contains(nextRandom))
+                    {
+                        nextRandom = Random.Next(0, 36);
+                    }
+                    randomValues[i] = nextRandom;
+                    SetTileState(nextRandom, 1, 0);  // Blocked
+                }
+            }
             ImGui.End();
-
-
-            /*
-            if(!FauxHollowsUiSettings.IsVisible)
-                return;
-            var x = FauxHollowsUiSettings.X;
-            var y = FauxHollowsUiSettings.Y;
-            var w = FauxHollowsUiSettings.Width;
-            var h = FauxHollowsUiSettings.Height;
-            ImGui.SetNextWindowPos(new Vector2(x + w / 2 - 3, y + h - 35), ImGuiCond.Always);
-            ImGui.SetNextWindowSize(new Vector2(w / 2, 30), ImGuiCond.Always);
-            ImGui.SetNextWindowBgAlpha(0.0f);
-
-            ImGui.PushStyleColor(ImGuiCol.ResizeGrip, 0);  // Hide the resize window grip
-            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0));
-            
-            bool alwaysTrue = true;
-            ImGui.Begin("FFXIV FauxHollows Solver", ref alwaysTrue,
-                ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse |
-                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar |
-                ImGuiWindowFlags.NoTitleBar);
-
-            var poweredText = $"Powered by PerfectFauxHollows";
-            var textSize = ImGui.CalcTextSize(poweredText);
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ImGui.GetColumnWidth() - textSize.X - ImGui.GetScrollX() - 2 * ImGui.GetStyle().ItemSpacing.X);  // right aligned
-            ImGui.Text(poweredText);
-
-            ImGui.End();
-
-            ImGui.PopStyleVar();
-            ImGui.PopStyleColor();
-            */
         }
 
-        #endregion ImGui
+        private unsafe void SetTileState(int index, int newState, int newRotation)
+        {
+            var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyPuzzle", 1);
+            if (addonPtr == IntPtr.Zero)
+                return;
+
+            var addon = (AddonWeeklyPuzzle*)addonPtr;
+            var tileButton = GetTileButton(addon, index);
+            var fgTile = GetIconImageNode(tileButton);
+            var bgTile = GetBackgroundImageNode(tileButton);
+
+            if (newState == 0)  // Hidden
+            {
+                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Hidden;
+                if (!bgTile->AtkResNode.IsVisible)
+                    bgTile->AtkResNode.Flags ^= 0x10;
+                if (fgTile->AtkResNode.IsVisible)
+                    fgTile->AtkResNode.Flags ^= 0x10;
+            }
+            else if (newState == 1)  // Blocked
+            {
+                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blocked;
+                if (!bgTile->AtkResNode.IsVisible)
+                    bgTile->AtkResNode.Flags ^= 0x10;
+                if (fgTile->AtkResNode.IsVisible)
+                    fgTile->AtkResNode.Flags ^= 0x10;
+            }
+            else if (newState == 2)  // Empty
+            {
+                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
+                if (!bgTile->AtkResNode.IsVisible)
+                    bgTile->AtkResNode.Flags ^= 0x10;
+                if (fgTile->AtkResNode.IsVisible)
+                    fgTile->AtkResNode.Flags ^= 0x10;
+            }
+            else
+            {
+                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
+                if (!fgTile->AtkResNode.IsVisible)
+                    fgTile->AtkResNode.Flags ^= 0x10;
+                var tileTexID = newState switch
+                {
+                    3 => WeeklyPuzzlePrizeTexture.BoxUpperLeft,
+                    4 => WeeklyPuzzlePrizeTexture.BoxUpperRight,
+                    5 => WeeklyPuzzlePrizeTexture.BoxLowerLeft,
+                    6 => WeeklyPuzzlePrizeTexture.BoxLowerRight,
+                    7 => WeeklyPuzzlePrizeTexture.ChestUpperLeft,
+                    8 => WeeklyPuzzlePrizeTexture.ChestUpperRight,
+                    9 => WeeklyPuzzlePrizeTexture.ChestLowerLeft,
+                    10 => WeeklyPuzzlePrizeTexture.ChestLowerRight,
+                    11 => WeeklyPuzzlePrizeTexture.SwordsUpperLeft,
+                    12 => WeeklyPuzzlePrizeTexture.SwordsUpperRight,
+                    13 => WeeklyPuzzlePrizeTexture.SwordsMiddleLeft,
+                    14 => WeeklyPuzzlePrizeTexture.SwordsMiddleRight,
+                    15 => WeeklyPuzzlePrizeTexture.SwordsLowerLeft,
+                    16 => WeeklyPuzzlePrizeTexture.SwordsLowerRight,
+                    17 => WeeklyPuzzlePrizeTexture.Commander,
+                    _ => throw new Exception("Invalid tile state")
+                };
+                fgTile->PartId = (ushort)tileTexID;
+                if (newRotation == 0)
+                {
+                    fgTile->AtkResNode.Rotation = 0;
+                }
+                else if (newRotation == 1)
+                {
+                    fgTile->AtkResNode.Rotation = -90;
+                }
+                else if (newRotation == 2)
+                {
+                    fgTile->AtkResNode.Rotation = 90;
+                }
+            }
+        }
     }
 }
