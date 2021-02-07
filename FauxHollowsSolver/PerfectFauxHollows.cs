@@ -30,11 +30,13 @@ namespace FauxHollowsSolver
             if (attemptsRemaining == 0)
                 return recommendations;
 
-            var checkedIndices = new List<int>();
-
             var foundSwords = false;
             var foundBoxChest = false;
             var foundCommander = false;
+
+            int[] knownSwords = null;
+            int[] knownBoxChest = null;
+            int[] knownCommander = null;
 
             var possibleSwords = new List<int[]>();
             var possibleBoxChests = new List<int[]>();
@@ -48,6 +50,7 @@ namespace FauxHollowsSolver
                 var x = i % TileRowLen;
                 var y = i / TileRowLen;
 
+                // Known values, where a tile is not blocked or empty
                 if (!foundSwords && (foundSwords = Tile.Swords.HasFlag(tile)))
                 {
                     possibleSwords.Clear();
@@ -77,15 +80,12 @@ namespace FauxHollowsSolver
                         _ => throw new Exception("Woops"),
                     };
 
-                    int[] foundIndices;
                     if (maskedTile.IsRotatedLeft() || maskedTile.IsRotatedRight())
-                        foundIndices = GetRectIndices(upperLeftIndex, 3, 2);
+                        knownSwords = GetRectIndices(upperLeftIndex, 3, 2);
                     else
-                        foundIndices = GetRectIndices(upperLeftIndex, 2, 3);
+                        knownSwords = GetRectIndices(upperLeftIndex, 2, 3);
 
-                    checkedIndices.AddRange(foundIndices);
-
-                    var hiddenIndices = foundIndices.Where(t => state[t] == Tile.Hidden).ToArray();
+                    var hiddenIndices = knownSwords.Where(t => state[t] == Tile.Hidden).ToArray();
                     if (hiddenIndices.Length <= attemptsRemaining)
                         foreach (var index in hiddenIndices)
                             recommendations[index] = ConfirmedSword;
@@ -128,27 +128,25 @@ namespace FauxHollowsSolver
                         _ => throw new Exception("Woops"),
                     };
 
-                    var foundIndices = GetRectIndices(upperLeftIndex, 2, 2);
+                    var recommendedValue = Tile.Box.HasFlag(tile) ? ConfirmedBox : ConfirmedChest;
 
-                    checkedIndices.AddRange(foundIndices);
-
-                    var recommendValue = Tile.Box.HasFlag(tile) ? ConfirmedBox : ConfirmedChest;
-
-                    var hiddenIndices = foundIndices.Where(t => state[t] == Tile.Hidden).ToArray();
+                    knownBoxChest = GetRectIndices(upperLeftIndex, 2, 2);
+                    var hiddenIndices = knownBoxChest.Where(t => state[t] == Tile.Hidden).ToArray();
                     if (hiddenIndices.Length <= attemptsRemaining)
                         foreach (var index in hiddenIndices)
-                            recommendations[index] = recommendValue;
+                            recommendations[index] = recommendedValue;
                 }
                 else if (!foundCommander && (foundCommander = Tile.Commander.HasFlag(tile)))
                 {
                     possibleCommanders.Clear();
 
-                    checkedIndices.Add(i);
+                    knownCommander = new int[] { i };
 
                     recommendations[i] = 0;
                 }
                 else
                 {
+                    // Gather potential locations each reward could be
                     if (!foundSwords && attemptsRemaining >= 6)
                     {
                         if (x < TileRowLen - 2 && y < TileColLen - 1)
@@ -177,18 +175,24 @@ namespace FauxHollowsSolver
 
                     if (!foundCommander && attemptsRemaining >= 1)
                     {
-                        var rect = GetRectIndices(i, 1, 1);
-                        if (rect.All(ri => state[ri] == Tile.Hidden))
-                            possibleCommanders.Add(rect);
+                        possibleCommanders.Add(new int[] { i });
                     }
                 }
             }
 
+            // Sum up the count of possibles where a known is not already present
             foreach (var rect in possibleSwords.Concat(possibleBoxChests).Concat(possibleCommanders))
+            {
+                if ((foundSwords && knownSwords.Intersect(rect).Count() > 0) ||
+                    (foundBoxChest && knownBoxChest.Intersect(rect).Count() > 0) ||
+                    (foundCommander && knownCommander.Intersect(rect).Count() > 0))
+                    continue;
+
                 foreach (var i in rect)
                     // Values over TileCount are reserved for known but hidden tiles
                     if (recommendations[i] < TotalTiles)
                         recommendations[i]++;
+            }
 
             return recommendations;
         }

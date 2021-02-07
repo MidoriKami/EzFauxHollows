@@ -20,30 +20,20 @@ namespace FauxHollowsSolver
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
-            Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
+            // Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
             LoopTokenSource = new CancellationTokenSource();
             LoopTask = Task.Run(() => GameBoardUpdaterLoop(LoopTokenSource.Token));
-
-            Interface.ClientState.OnLogin += UserWarning;
-            if (Interface.ClientState.LocalPlayer != null)
-                UserWarning(null, null);
-        }
-
-        private void UserWarning(object sender, EventArgs args)
-        {
-            Interface.Framework.Gui.Chat.PrintError($"{Name} may be unstable still, user beware.");
         }
 
         public void Dispose()
         {
-            Interface.ClientState.OnLogin -= UserWarning;
-            Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
+            // Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
             LoopTokenSource.Cancel();
         }
 
         private Task LoopTask;
         private CancellationTokenSource LoopTokenSource;
-        private Tile[] GameState = new Tile[36];
+        private readonly Tile[] GameState = new Tile[36];
         private readonly PerfectFauxHollows PerfectFauxHollows = new PerfectFauxHollows();
 
         private async void GameBoardUpdaterLoop(CancellationToken token)
@@ -194,7 +184,7 @@ namespace FauxHollowsSolver
 
         private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.ULDData.NodeList[6];
 
-
+        /*
         private unsafe void UiBuilder_OnBuildUi_DebugUI()
         {
             ImGui.SetNextWindowPos(new Vector2(500, 500), ImGuiCond.FirstUseEver);
@@ -291,6 +281,7 @@ namespace FauxHollowsSolver
             }
             ImGui.End();
         }
+        */
 
         private unsafe void SetTileState(int index, int newState, int newRotation)
         {
