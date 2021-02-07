@@ -82,12 +82,12 @@
     <ItemGroup>
       <DeleteAssemblies Include="$(TargetDir)*.dll" Exclude="$(TargetPath)" />
     </ItemGroup>
-    <Message Text="Deleting @(DeleteAssemblies)" Importance="high"/>
+    <Message Text="Deleting @(DeleteAssemblies)" Importance="high" />
     <Delete Files="@(DeleteAssemblies)" />
   </Target>
 
   <Target Name="PackagePlugin" AfterTargets="CleanOutDir" Condition=" '$(Configuration)' == 'Release' ">
-    <Message Text="Starting DalamudPackager" Importance="high"/>
+    <Message Text="Starting DalamudPackager" Importance="high" />
     <DalamudPackager ProjectDir="$(ProjectDir)" OutputPath="$(OutputPath)" AssemblyName="$(AssemblyName)" VersionComponents="4" MakeZip="true" />
   </Target>
 </Project>
