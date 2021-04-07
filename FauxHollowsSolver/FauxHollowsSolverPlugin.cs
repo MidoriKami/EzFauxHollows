@@ -1,12 +1,10 @@
 ﻿using Dalamud.Plugin;
-using ImGuiNET;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using System;
 using System.Linq;
-using System.Numerics;
-using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.Internal;
 
 namespace FauxHollowsSolver
 {
@@ -21,32 +19,27 @@ namespace FauxHollowsSolver
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
             // Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
-            LoopTokenSource = new CancellationTokenSource();
-            LoopTask = Task.Run(() => GameBoardUpdaterLoop(LoopTokenSource.Token));
+            Interface.Framework.OnUpdateEvent += GameUpdater;
         }
 
         public void Dispose()
         {
+            Interface.Framework.OnUpdateEvent -= GameUpdater;
             // Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
-            LoopTokenSource.Cancel();
         }
 
-        private Task LoopTask;
-        private CancellationTokenSource LoopTokenSource;
+        private Task GameTask;
         private readonly Tile[] GameState = new Tile[36];
         private readonly PerfectFauxHollows PerfectFauxHollows = new PerfectFauxHollows();
 
-        private async void GameBoardUpdaterLoop(CancellationToken token)
+        private void GameUpdater(Framework framework)
         {
-            for (int i = 0; i < 36; i++)
-                GameState[i] = Tile.Unknown;
-
             try
             {
-                while (!token.IsCancellationRequested)
+                if (GameTask == null || GameTask.IsCompleted || GameTask.IsFaulted || GameTask.IsCanceled)
                 {
-                    await Task.Delay(100, token);
-                    GameBoardUpdater();
+                    GameTask = new Task(GameUpdater);
+                    GameTask.Start();
                 }
             }
             catch (OperationCanceledException) { }
@@ -57,7 +50,7 @@ namespace FauxHollowsSolver
             }
         }
 
-        private unsafe void GameBoardUpdater()
+        private unsafe void GameUpdater()
         {
             if (Interface.ClientState.TerritoryType != 478) // Idyllshire
                 return;
@@ -72,6 +65,9 @@ namespace FauxHollowsSolver
 
             if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.ULDData.LoadedState != 3)
                 return;
+
+            for (int i = 0; i < 36; i++)
+                GameState[i] = Tile.Unknown;
 
             var stateChanged = UpdateGameState(addon);
             if (stateChanged)
