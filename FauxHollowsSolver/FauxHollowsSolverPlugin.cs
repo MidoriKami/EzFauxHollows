@@ -4,7 +4,11 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dalamud.Game.Internal;
+using Dalamud.Game;
+using Dalamud.Logging;
+using Dalamud.Game.Gui;
+using Dalamud.Game.ClientState;
+using Dalamud.IoC;
 
 namespace FauxHollowsSolver
 {
@@ -12,25 +16,39 @@ namespace FauxHollowsSolver
     {
         public string Name => "ezFauxHollows";
 
-        internal DalamudPluginInterface Interface;
+        internal DalamudPluginInterface Interface { get; init; }
+        internal ChatGui ChatGui { get; init; }
+        internal ClientState ClientState { get; init; }
+        internal Framework Framework { get; init; }
+        internal GameGui GameGui { get; init; }
 
-        public void Initialize(DalamudPluginInterface pluginInterface)
+        public FauxHollowsPlugin(
+            [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
+            [RequiredVersion("1.0")] ChatGui chatGui,
+            [RequiredVersion("1.0")] ClientState clientState,
+            [RequiredVersion("1.0")] Framework framework,
+            [RequiredVersion("1.0")] GameGui gameGui)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
+            ChatGui = chatGui;
+            ClientState = clientState;
+            Framework = framework;
+            GameGui = gameGui;
+
             // Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
-            Interface.Framework.OnUpdateEvent += GameUpdater;
+            Framework.Update += GameUpdater;
         }
 
         public void Dispose()
         {
-            Interface.Framework.OnUpdateEvent -= GameUpdater;
+            Framework.Update -= GameUpdater;
             // Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
         }
 
         private Task GameTask;
         private readonly Tile[] GameState = new Tile[36];
-        private readonly PerfectFauxHollows PerfectFauxHollows = new PerfectFauxHollows();
+        private readonly PerfectFauxHollows PerfectFauxHollows = new();
 
         private void GameUpdater(Framework framework)
         {
@@ -46,16 +64,16 @@ namespace FauxHollowsSolver
             catch (Exception ex)
             {
                 PluginLog.Error(ex, "Updater loop has crashed");
-                Interface.Framework.Gui.Chat.PrintError($"{Name} has encountered a critical error");
+                ChatGui.PrintError($"{Name} has encountered a critical error");
             }
         }
 
         private unsafe void GameUpdater()
         {
-            if (Interface.ClientState.TerritoryType != 478) // Idyllshire
+            if (ClientState.TerritoryType != 478) // Idyllshire
                 return;
 
-            var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyPuzzle", 1);
+            var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
             if (addonPtr == IntPtr.Zero)
                 return;
 
@@ -63,7 +81,7 @@ namespace FauxHollowsSolver
             if (addon == null)
                 return;
 
-            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.ULDData.LoadedState != 3)
+            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
                 return;
 
             for (int i = 0; i < 36; i++)
@@ -176,9 +194,9 @@ namespace FauxHollowsSolver
 
         private unsafe AtkComponentButton* GetTileButton(AddonWeeklyPuzzle* addon, int index) => addon->GameBoard[index / 6][index % 6].Button;
 
-        private unsafe AtkImageNode* GetBackgroundImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.ULDData.NodeList[3];
+        private unsafe AtkImageNode* GetBackgroundImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[3];
 
-        private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.ULDData.NodeList[6];
+        private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[6];
 
         /*
         private unsafe void UiBuilder_OnBuildUi_DebugUI()
@@ -281,7 +299,7 @@ namespace FauxHollowsSolver
 
         private unsafe void SetTileState(int index, int newState, int newRotation)
         {
-            var addonPtr = Interface.Framework.Gui.GetUiObjectByName("WeeklyPuzzle", 1);
+            var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
             if (addonPtr == IntPtr.Zero)
                 return;
 
