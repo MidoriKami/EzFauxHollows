@@ -8,7 +8,6 @@ using Dalamud.Game;
 using Dalamud.Logging;
 using Dalamud.Game.Gui;
 using Dalamud.Game.ClientState;
-using Dalamud.IoC;
 
 namespace FauxHollowsSolver
 {
@@ -23,11 +22,11 @@ namespace FauxHollowsSolver
         internal GameGui GameGui { get; init; }
 
         public FauxHollowsPlugin(
-            [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
-            [RequiredVersion("1.0")] ChatGui chatGui,
-            [RequiredVersion("1.0")] ClientState clientState,
-            [RequiredVersion("1.0")] Framework framework,
-            [RequiredVersion("1.0")] GameGui gameGui)
+            DalamudPluginInterface pluginInterface,
+            ChatGui chatGui,
+            ClientState clientState,
+            Framework framework,
+            GameGui gameGui)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
@@ -37,12 +36,12 @@ namespace FauxHollowsSolver
             GameGui = gameGui;
 
             // Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
-            Framework.Update += GameUpdater;
+            Framework.Update += FrameworPuzzlePoll;
         }
 
         public void Dispose()
         {
-            Framework.Update -= GameUpdater;
+            Framework.Update -= FrameworPuzzlePoll;
             // Interface.UiBuilder.OnBuildUi -= UiBuilder_OnBuildUi_DebugUI;
         }
 
@@ -50,14 +49,20 @@ namespace FauxHollowsSolver
         private readonly Tile[] GameState = new Tile[36];
         private readonly PerfectFauxHollows PerfectFauxHollows = new();
 
-        private void GameUpdater(Framework framework)
+        private void FrameworPuzzlePoll(Framework framework)
         {
             try
             {
+                if (ClientState.TerritoryType != 478) // Idyllshire
+                    return;
+
+                var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
+                if (addonPtr == IntPtr.Zero)
+                    return;
+
                 if (GameTask == null || GameTask.IsCompleted || GameTask.IsFaulted || GameTask.IsCanceled)
                 {
-                    GameTask = new Task(GameUpdater);
-                    GameTask.Start();
+                    GameTask = Task.Run(() => GameUpdater(addonPtr));
                 }
             }
             catch (OperationCanceledException) { }
@@ -68,18 +73,9 @@ namespace FauxHollowsSolver
             }
         }
 
-        private unsafe void GameUpdater()
+        private unsafe void GameUpdater(IntPtr addonPtr)
         {
-            if (ClientState.TerritoryType != 478) // Idyllshire
-                return;
-
-            var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
-            if (addonPtr == IntPtr.Zero)
-                return;
-
             var addon = (AddonWeeklyPuzzle*)addonPtr;
-            if (addon == null)
-                return;
 
             if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
                 return;

@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>FauxHollowsSolver</PackageId>
-    <Version>1.1.0.0</Version>
+    <Version>1.1.0.1</Version>
     <Authors>daemitus</Authors>
     <Company>-</Company>
     <Description></Description>
@@ -44,10 +44,6 @@
       <HintPath>$(DalamudLibPath)ImGui.NET.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="ImGuiScene">
-      <HintPath>$(DalamudLibPath)ImGuiScene.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
   </ItemGroup>
 
   <Target Name="ILRepack" AfterTargets="Build">
@@ -60,7 +56,8 @@
 
   <Target Name="CleanOutDir" AfterTargets="ILRepack">
     <ItemGroup>
-      <DeleteAssemblies Include="$(TargetDir)*.dll" Exclude="$(TargetPath)" />
+      <DeleteAssemblies Include="$(TargetDir)*.dll" Exclude="$(TargetDir)$(TargetName).dll" />
+      <DeleteAssemblies Include="$(TargetDir)*.pdb" Exclude="$(TargetDir)$(TargetName).pdb" />
     </ItemGroup>
     <Message Text="Deleting @(DeleteAssemblies)" Importance="high" />
     <Delete Files="@(DeleteAssemblies)" />
