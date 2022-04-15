@@ -16,7 +16,7 @@ namespace FauxHollowsSolver
         public const int ConfirmedBox = 60;
         public const int ConfirmedChest = 70;
 
-        public int[] Solve(Tile[] state)
+        public static int[] Solve(Tile[] state)
         {
             var recommendations = new int[TotalTiles];
 
@@ -61,8 +61,8 @@ namespace FauxHollowsSolver
                         Tile.SwordsUpperRight => i - 1,
                         Tile.SwordsMiddleLeft => i - TileRowLen,
                         Tile.SwordsMiddleRight => i - 1 - TileRowLen,
-                        Tile.SwordsLowerLeft => i - TileRowLen * 2,
-                        Tile.SwordsLowerRight => i - 1 - TileRowLen * 2,
+                        Tile.SwordsLowerLeft => i - (TileRowLen * 2),
+                        Tile.SwordsLowerRight => i - 1 - (TileRowLen * 2),
 
                         Tile.SwordsUpperLeft | Tile.RotatedLeft => i - TileRowLen,
                         Tile.SwordsUpperRight | Tile.RotatedLeft => i,
@@ -183,9 +183,9 @@ namespace FauxHollowsSolver
             // Sum up the count of possibles where a known is not already present
             foreach (var rect in possibleSwords.Concat(possibleBoxChests).Concat(possibleCommanders))
             {
-                if ((foundSwords && knownSwords.Intersect(rect).Count() > 0) ||
-                    (foundBoxChest && knownBoxChest.Intersect(rect).Count() > 0) ||
-                    (foundCommander && knownCommander.Intersect(rect).Count() > 0))
+                if ((foundSwords && knownSwords.Intersect(rect).Any()) ||
+                    (foundBoxChest && knownBoxChest.Intersect(rect).Any()) ||
+                    (foundCommander && knownCommander.Intersect(rect).Any()))
                     continue;
 
                 foreach (var i in rect)
@@ -197,7 +197,7 @@ namespace FauxHollowsSolver
             return recommendations;
         }
 
-        private int[] GetRectIndices(int upperLeftCornerIndex, int xMax, int yMax)
+        private static int[] GetRectIndices(int upperLeftCornerIndex, int xMax, int yMax)
         {
             var i = 0;
             var indices = new int[xMax * yMax];
@@ -205,7 +205,7 @@ namespace FauxHollowsSolver
             {
                 for (int x = 0; x < xMax; x++)
                 {
-                    indices[i] = upperLeftCornerIndex + x + y * TileRowLen;
+                    indices[i] = upperLeftCornerIndex + x + (y * TileRowLen);
                     i++;
                 }
             }

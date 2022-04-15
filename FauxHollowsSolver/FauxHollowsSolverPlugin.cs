@@ -188,11 +188,14 @@ namespace FauxHollowsSolver
             return stateChanged;
         }
 
-        private unsafe AtkComponentButton* GetTileButton(AddonWeeklyPuzzle* addon, int index) => addon->GameBoard[index / 6][index % 6].Button;
+        private unsafe AtkComponentButton* GetTileButton(AddonWeeklyPuzzle* addon, int index)
+            => addon->GameBoard[index / 6][index % 6].Button;
 
-        private unsafe AtkImageNode* GetBackgroundImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[3];
+        private unsafe AtkImageNode* GetBackgroundImageNode(AtkComponentButton* button)
+            => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[3];
 
-        private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button) => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[6];
+        private unsafe AtkImageNode* GetIconImageNode(AtkComponentButton* button)
+            => (AtkImageNode*)button->AtkComponentBase.UldManager.NodeList[6];
 
         /*
         private unsafe void UiBuilder_OnBuildUi_DebugUI()
