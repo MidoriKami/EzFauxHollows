@@ -77,7 +77,7 @@ namespace FauxHollowsSolver
         {
             var addon = (AddonWeeklyPuzzle*)addonPtr;
 
-            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != 3)
+            if (!addon->AtkUnitBase.IsVisible || addon->AtkUnitBase.UldManager.LoadedState != AtkLoadState.Loaded)
                 return;
 
             for (int i = 0; i < 36; i++)
