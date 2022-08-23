@@ -1,6 +1,6 @@
-name: Build
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 
-# Put your personal access token in a repository secret named PAT for cross-repository access
+name: Build
 
 on: 
   workflow_dispatch:
@@ -66,13 +66,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v2
-      id: download-artifact
-      with:
-        name: PluginRepoZip
-        path: PluginArtifact
-    - uses: daemitus/DalamudPluginPR@master
+    - uses: daemitus/DalamudPluginPR2@master
       with: 
         token: ${{ secrets.PAT }}
-        artifact_path: ${{ steps.download-artifact.outputs.download-path }}
+        plugin_name: FauxHollowsSolver
