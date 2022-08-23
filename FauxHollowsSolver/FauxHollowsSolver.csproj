@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>FauxHollowsSolver</PackageId>
-    <Version>1.1.1.0</Version>
+    <Version>1.1.1.1</Version>
     <Authors>daemitus</Authors>
     <Company>-</Company>
     <Description></Description>
