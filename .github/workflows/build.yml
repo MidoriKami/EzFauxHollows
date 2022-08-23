@@ -16,3 +16,5 @@ jobs:
       with: 
         token: ${{ secrets.PAT }}
         plugin_name: FauxHollowsSolver
+        project_path: FauxHollowsSolver
+        plugin_owners: daemitus
