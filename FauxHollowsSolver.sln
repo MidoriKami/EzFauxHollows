@@ -15,10 +15,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github Actions", "Github Ac
 		.github\workflows\build.yml = .github\workflows\build.yml
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFXIVClientStructs", "lib\FFXIVClientStructs\FFXIVClientStructs\FFXIVClientStructs.csproj", "{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFXIVClientStructs.Generators", "lib\FFXIVClientStructs\FFXIVClientStructs.Generators\FFXIVClientStructs.Generators.csproj", "{CC254833-10DA-46A0-A325-B1357CEAB0AA}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,22 +31,6 @@ Global
 		{5A6E2A95-1D4A-4BFA-89B0-086A1A080516}.Release|Any CPU.Build.0 = Release|x64
 		{5A6E2A95-1D4A-4BFA-89B0-086A1A080516}.Release|x64.ActiveCfg = Release|x64
 		{5A6E2A95-1D4A-4BFA-89B0-086A1A080516}.Release|x64.Build.0 = Release|x64
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Debug|x64.Build.0 = Debug|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Release|x64.ActiveCfg = Release|Any CPU
-		{96552C3F-37DF-4C52-9DE5-1A9BF2655D5F}.Release|x64.Build.0 = Release|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Debug|x64.Build.0 = Debug|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Release|x64.ActiveCfg = Release|Any CPU
-		{CC254833-10DA-46A0-A325-B1357CEAB0AA}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
