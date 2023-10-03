@@ -4,10 +4,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dalamud.Game;
-using Dalamud.Logging;
-using Dalamud.Game.Gui;
-using Dalamud.Game.ClientState;
+using Dalamud.Plugin.Services;
 
 namespace FauxHollowsSolver
 {
@@ -16,17 +13,19 @@ namespace FauxHollowsSolver
         public string Name => "ezFauxHollows";
 
         internal DalamudPluginInterface Interface { get; init; }
-        internal ChatGui ChatGui { get; init; }
-        internal ClientState ClientState { get; init; }
-        internal Framework Framework { get; init; }
-        internal GameGui GameGui { get; init; }
+        internal IChatGui ChatGui { get; init; }
+        internal IClientState ClientState { get; init; }
+        internal IFramework Framework { get; init; }
+        internal IGameGui GameGui { get; init; }
+        internal IPluginLog PluginLog { get; init; }
 
         public FauxHollowsPlugin(
             DalamudPluginInterface pluginInterface,
-            ChatGui chatGui,
-            ClientState clientState,
-            Framework framework,
-            GameGui gameGui)
+            IChatGui chatGui,
+            IClientState clientState,
+            IFramework framework,
+            IGameGui gameGui,
+            IPluginLog pluginLog)
         {
             Interface = pluginInterface ?? throw new ArgumentNullException(nameof(pluginInterface), "DalamudPluginInterface cannot be null");
 
@@ -34,6 +33,7 @@ namespace FauxHollowsSolver
             ClientState = clientState;
             Framework = framework;
             GameGui = gameGui;
+            PluginLog = pluginLog;
 
             // Interface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi_DebugUI;
             Framework.Update += FrameworPuzzlePoll;
@@ -49,7 +49,7 @@ namespace FauxHollowsSolver
         private readonly Tile[] GameState = new Tile[36];
         private readonly PerfectFauxHollows PerfectFauxHollows = new();
 
-        private void FrameworPuzzlePoll(Framework framework)
+        private void FrameworPuzzlePoll(IFramework framework)
         {
             try
             {
@@ -296,79 +296,79 @@ namespace FauxHollowsSolver
         }
         */
 
-        private unsafe void SetTileState(int index, int newState, int newRotation)
-        {
-            var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
-            if (addonPtr == IntPtr.Zero)
-                return;
-
-            var addon = (AddonWeeklyPuzzle*)addonPtr;
-            var tileButton = GetTileButton(addon, index);
-            var fgTile = GetIconImageNode(tileButton);
-            var bgTile = GetBackgroundImageNode(tileButton);
-
-            if (newState == 0)  // Hidden
-            {
-                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Hidden;
-                if (!bgTile->AtkResNode.IsVisible)
-                    bgTile->AtkResNode.Flags ^= 0x10;
-                if (fgTile->AtkResNode.IsVisible)
-                    fgTile->AtkResNode.Flags ^= 0x10;
-            }
-            else if (newState == 1)  // Blocked
-            {
-                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blocked;
-                if (!bgTile->AtkResNode.IsVisible)
-                    bgTile->AtkResNode.Flags ^= 0x10;
-                if (fgTile->AtkResNode.IsVisible)
-                    fgTile->AtkResNode.Flags ^= 0x10;
-            }
-            else if (newState == 2)  // Empty
-            {
-                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
-                if (!bgTile->AtkResNode.IsVisible)
-                    bgTile->AtkResNode.Flags ^= 0x10;
-                if (fgTile->AtkResNode.IsVisible)
-                    fgTile->AtkResNode.Flags ^= 0x10;
-            }
-            else
-            {
-                bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
-                if (!fgTile->AtkResNode.IsVisible)
-                    fgTile->AtkResNode.Flags ^= 0x10;
-                var tileTexID = newState switch
-                {
-                    3 => WeeklyPuzzlePrizeTexture.BoxUpperLeft,
-                    4 => WeeklyPuzzlePrizeTexture.BoxUpperRight,
-                    5 => WeeklyPuzzlePrizeTexture.BoxLowerLeft,
-                    6 => WeeklyPuzzlePrizeTexture.BoxLowerRight,
-                    7 => WeeklyPuzzlePrizeTexture.ChestUpperLeft,
-                    8 => WeeklyPuzzlePrizeTexture.ChestUpperRight,
-                    9 => WeeklyPuzzlePrizeTexture.ChestLowerLeft,
-                    10 => WeeklyPuzzlePrizeTexture.ChestLowerRight,
-                    11 => WeeklyPuzzlePrizeTexture.SwordsUpperLeft,
-                    12 => WeeklyPuzzlePrizeTexture.SwordsUpperRight,
-                    13 => WeeklyPuzzlePrizeTexture.SwordsMiddleLeft,
-                    14 => WeeklyPuzzlePrizeTexture.SwordsMiddleRight,
-                    15 => WeeklyPuzzlePrizeTexture.SwordsLowerLeft,
-                    16 => WeeklyPuzzlePrizeTexture.SwordsLowerRight,
-                    17 => WeeklyPuzzlePrizeTexture.Commander,
-                    _ => throw new Exception("Invalid tile state")
-                };
-                fgTile->PartId = (ushort)tileTexID;
-                if (newRotation == 0)
-                {
-                    fgTile->AtkResNode.Rotation = 0;
-                }
-                else if (newRotation == 1)
-                {
-                    fgTile->AtkResNode.Rotation = -90;
-                }
-                else if (newRotation == 2)
-                {
-                    fgTile->AtkResNode.Rotation = 90;
-                }
-            }
-        }
+        // private unsafe void SetTileState(int index, int newState, int newRotation)
+        // {
+        //     var addonPtr = GameGui.GetAddonByName("WeeklyPuzzle", 1);
+        //     if (addonPtr == IntPtr.Zero)
+        //         return;
+        //
+        //     var addon = (AddonWeeklyPuzzle*)addonPtr;
+        //     var tileButton = GetTileButton(addon, index);
+        //     var fgTile = GetIconImageNode(tileButton);
+        //     var bgTile = GetBackgroundImageNode(tileButton);
+        //
+        //     if (newState == 0)  // Hidden
+        //     {
+        //         bgTile->PartId = (ushort)WeeklyPuzzleTexture.Hidden;
+        //         if (!bgTile->AtkResNode.IsVisible)
+        //             bgTile->AtkResNode.Flags ^= 0x10;
+        //         if (fgTile->AtkResNode.IsVisible)
+        //             fgTile->AtkResNode.Flags ^= 0x10;
+        //     }
+        //     else if (newState == 1)  // Blocked
+        //     {
+        //         bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blocked;
+        //         if (!bgTile->AtkResNode.IsVisible)
+        //             bgTile->AtkResNode.Flags ^= 0x10;
+        //         if (fgTile->AtkResNode.IsVisible)
+        //             fgTile->AtkResNode.Flags ^= 0x10;
+        //     }
+        //     else if (newState == 2)  // Empty
+        //     {
+        //         bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
+        //         if (!bgTile->AtkResNode.IsVisible)
+        //             bgTile->AtkResNode.Flags ^= 0x10;
+        //         if (fgTile->AtkResNode.IsVisible)
+        //             fgTile->AtkResNode.Flags ^= 0x10;
+        //     }
+        //     else
+        //     {
+        //         bgTile->PartId = (ushort)WeeklyPuzzleTexture.Blank;
+        //         if (!fgTile->AtkResNode.IsVisible)
+        //             fgTile->AtkResNode.Flags ^= 0x10;
+        //         var tileTexID = newState switch
+        //         {
+        //             3 => WeeklyPuzzlePrizeTexture.BoxUpperLeft,
+        //             4 => WeeklyPuzzlePrizeTexture.BoxUpperRight,
+        //             5 => WeeklyPuzzlePrizeTexture.BoxLowerLeft,
+        //             6 => WeeklyPuzzlePrizeTexture.BoxLowerRight,
+        //             7 => WeeklyPuzzlePrizeTexture.ChestUpperLeft,
+        //             8 => WeeklyPuzzlePrizeTexture.ChestUpperRight,
+        //             9 => WeeklyPuzzlePrizeTexture.ChestLowerLeft,
+        //             10 => WeeklyPuzzlePrizeTexture.ChestLowerRight,
+        //             11 => WeeklyPuzzlePrizeTexture.SwordsUpperLeft,
+        //             12 => WeeklyPuzzlePrizeTexture.SwordsUpperRight,
+        //             13 => WeeklyPuzzlePrizeTexture.SwordsMiddleLeft,
+        //             14 => WeeklyPuzzlePrizeTexture.SwordsMiddleRight,
+        //             15 => WeeklyPuzzlePrizeTexture.SwordsLowerLeft,
+        //             16 => WeeklyPuzzlePrizeTexture.SwordsLowerRight,
+        //             17 => WeeklyPuzzlePrizeTexture.Commander,
+        //             _ => throw new Exception("Invalid tile state")
+        //         };
+        //         fgTile->PartId = (ushort)tileTexID;
+        //         if (newRotation == 0)
+        //         {
+        //             fgTile->AtkResNode.Rotation = 0;
+        //         }
+        //         else if (newRotation == 1)
+        //         {
+        //             fgTile->AtkResNode.Rotation = -90;
+        //         }
+        //         else if (newRotation == 2)
+        //         {
+        //             fgTile->AtkResNode.Rotation = 90;
+        //         }
+        //     }
+        // }
     }
 }
