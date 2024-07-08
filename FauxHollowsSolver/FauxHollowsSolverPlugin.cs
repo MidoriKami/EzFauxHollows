@@ -12,7 +12,7 @@ namespace FauxHollowsSolver
     {
         public string Name => "ezFauxHollows";
 
-        internal DalamudPluginInterface Interface { get; init; }
+        internal IDalamudPluginInterface Interface { get; init; }
         internal IChatGui ChatGui { get; init; }
         internal IClientState ClientState { get; init; }
         internal IFramework Framework { get; init; }
@@ -20,7 +20,7 @@ namespace FauxHollowsSolver
         internal IPluginLog PluginLog { get; init; }
 
         public FauxHollowsPlugin(
-            DalamudPluginInterface pluginInterface,
+            IDalamudPluginInterface pluginInterface,
             IChatGui chatGui,
             IClientState clientState,
             IFramework framework,
@@ -144,7 +144,7 @@ namespace FauxHollowsSolver
                     var tileIconImage = GetIconImageNode(tileButton);
                     var tileIconTex = (WeeklyPuzzlePrizeTexture)tileIconImage->PartId;
 
-                    if (!tileIconImage->AtkResNode.IsVisible)
+                    if (!tileIconImage->AtkResNode.IsVisible())
                     {
                         newState = Tile.Empty;
                     }
