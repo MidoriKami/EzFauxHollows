@@ -1,48 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Dalamud.NET.Sdk/11.0.0">
   <PropertyGroup>
     <PackageId>FauxHollowsSolver</PackageId>
     <Version>1.3.0.0</Version>
     <Authors>daemitus</Authors>
-    <Company>-</Company>
     <PackageProjectUrl>https://github.com/daemitus/FauxHollowsSolver</PackageProjectUrl>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net7.0-windows</TargetFramework>
-    <Platforms>x64</Platforms>
-    <LangVersion>latest</LangVersion>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="..\res\icon.png" Link="images\icon.png" CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <Content Include="..\res\image1.png" Link="images\image1.png" CopyToOutputDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <AssemblySearchPaths>
-      $(AssemblySearchPaths);
-      $(DalamudLibPath);
-    </AssemblySearchPaths>
-  </PropertyGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.12" />
-    <Reference Include="FFXIVClientStructs" Private="False" />
-    <Reference Include="Newtonsoft.Json" Private="False" />
-    <Reference Include="Dalamud" Private="False" />
-    <Reference Include="ImGui.NET" Private="False" />
-    <Reference Include="Lumina" Private="False" />
-    <Reference Include="Lumina.Excel" Private="False" />
   </ItemGroup>
 </Project>
